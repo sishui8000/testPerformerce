@@ -1,0 +1,52 @@
+name: Build Bench (j2)
+
+# 在 GitHub 官方 runner 上跑同一份编译吞吐基准，与本机结果对比。
+# 用法：把 build_bench.py 放到仓库根目录，本文件放到 .github/workflows/ 下，
+#       然后 Actions -> Build Bench (j2) -> Run workflow。
+on:
+  workflow_dispatch:
+    inputs:
+      jobs:
+        description: '并行编译任务数'
+        required: false
+        default: '2'
+      target:
+        description: '主测试目标时长（秒）'
+        required: false
+        default: '300'
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Runner info
+        run: |
+          echo "nproc=$(nproc)"
+          lscpu | sed -n '1,16p'
+          free -h
+          df -hT "$PWD"
+          gcc --version | head -1
+
+      - name: Run benchmark
+        run: |
+          python3 build_bench.py \
+            --jobs "${{ github.event.inputs.jobs || '2' }}" \
+            --target "${{ github.event.inputs.target || '300' }}"
+
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-result
+          path: bench-result.txt
+          if-no-files-found: warn
+
+      - name: Show result
+        if: always()
+        run: cat bench-result.txt || true
