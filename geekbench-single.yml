@@ -1,0 +1,55 @@
+name: Geekbench 6 Single-Core
+
+# 在 GitHub 官方 runner 上测 Geekbench 6 单核成绩。
+# 用法：把 geekbench_single.sh 放到仓库根目录，本文件放到 .github/workflows/ 下，
+#       然后 Actions -> Geekbench 6 Single-Core -> Run workflow。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Geekbench 6 版本'
+        required: false
+        default: '6.6.0'
+      runs:
+        description: '重复次数（取最高分）'
+        required: false
+        default: '1'
+      upload:
+        description: '上传结果到 geekbench 浏览器（1=是，0=否）'
+        required: false
+        default: '0'
+
+permissions:
+  contents: read
+
+jobs:
+  geekbench:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Runner info
+        run: |
+          echo "nproc=$(nproc)"
+          lscpu | sed -n '1,16p'
+          free -h
+          cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor 2>/dev/null || true
+
+      - name: Run Geekbench 6
+        env:
+          GB_VERSION: ${{ github.event.inputs.version || '6.6.0' }}
+          RUNS: ${{ github.event.inputs.runs || '1' }}
+          UPLOAD: ${{ github.event.inputs.upload || '0' }}
+        run: bash geekbench_single.sh
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: geekbench-result
+          path: |
+            geekbench-result.txt
+            .geekbench/Geekbench-*/gb-run-*.log
+          if-no-files-found: warn
